@@ -25,14 +25,33 @@
 
 package com.acervera.osm4scala.model
 
-import org.openstreetmap.osmosis.osmbinary.osmformat.{Relation, StringTable}
+import org.openstreetmap.osmosis.osmbinary.osmformat.{Info, Relation, StringTable}
 
 /**
   * Entity that represent a OSM relation as https://wiki.openstreetmap.org/wiki/Elements#Relation and https://wiki.openstreetmap.org/wiki/Relation describe
   */
-case class RelationEntity(id: Long, relations: Seq[RelationMemberEntity], tags: Map[String, String]) extends OSMEntity {
+case class RelationEntity(id: Long,
+                          relations: Seq[RelationMemberEntity],
+                          tags: Map[String, String],
+                          version: Option[Int] = None,
+                          timestamp: Option[Long] = None,
+                          changeset: Option[Long] = None,
+                          uid: Option[Int],
+                          user_sid: Option[Int] = None,
+                          visible: Option[Boolean] = None) extends OSMEntity {
 
   override val osmModel: OSMTypes.Value = OSMTypes.Relation
+  override def toString: String = {
+    s"Relation id: ${id}, " +
+      s"relations: ${relations}, " +
+      s"tags: ${tags.toList}, " +
+      s"version: ${version.getOrElse("None")}," +
+      s"timestamp: ${timestamp.getOrElse("None")}, " +
+      s"changeset: ${changeset.getOrElse("None")}, " +
+      s"uid: ${uid.getOrElse("None")}, " +
+      s"user_sid: ${user_sid.getOrElse("None")}, " +
+      s"visible: ${visible.getOrElse("True")}"
+  }
 
 }
 
@@ -41,19 +60,31 @@ object RelationEntity {
   def apply(osmosisStringTable: StringTable, osmosisRelation: Relation): RelationEntity = {
 
     // Calculate tags using the StringTable.
-    val tags = (osmosisRelation.keys, osmosisRelation.vals).zipped.map { (k, v) =>
+    val tags: Map[String, String] = (osmosisRelation.keys, osmosisRelation.vals).zipped.map { (k, v) =>
       osmosisStringTable.s(k).toString("UTF-8") -> osmosisStringTable.s(v).toString("UTF-8")
     }.toMap
 
     // Decode members references in stored in delta compression.
-    val members = osmosisRelation.memids.scanLeft(0L) { _ + _ }.drop(1)
+    val members: Seq[Long] = osmosisRelation.memids.scanLeft(0L) { _ + _ }.drop(1)
+
+    val optionalInfo: Option[Info] = osmosisRelation.info
 
     // Calculate relations
-    val relations = (members, osmosisRelation.types, osmosisRelation.rolesSid).zipped.map { (m, t, r) =>
+    val relations: Seq[RelationMemberEntity] = (members, osmosisRelation.types, osmosisRelation.rolesSid).zipped.map { (m, t, r) =>
       RelationMemberEntity(m, RelationMemberEntityTypes(t.value), osmosisStringTable.s(r).toString("UTF-8"))
     }
 
-    new RelationEntity(osmosisRelation.id, relations, tags)
+    RelationEntity(
+      id = osmosisRelation.id,
+      relations = relations,
+      tags = tags,
+      version = if(optionalInfo.isDefined) optionalInfo.get.version else None,
+      timestamp = if(optionalInfo.isDefined) optionalInfo.get.timestamp else None,
+      changeset = if(optionalInfo.isDefined) optionalInfo.get.changeset else None,
+      uid = if(optionalInfo.isDefined) optionalInfo.get.uid else None,
+      user_sid = if(optionalInfo.isDefined) optionalInfo.get.userSid else None,
+      visible = if(optionalInfo.isDefined) optionalInfo.get.visible else None
+    )
   }
 
 }

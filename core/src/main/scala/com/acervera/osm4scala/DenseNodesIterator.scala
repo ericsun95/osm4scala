@@ -26,7 +26,7 @@
 package com.acervera.osm4scala
 
 import com.acervera.osm4scala.model.NodeEntity
-import org.openstreetmap.osmosis.osmbinary.osmformat.{DenseNodes, StringTable}
+import org.openstreetmap.osmosis.osmbinary.osmformat.{DenseInfo, DenseNodes, StringTable}
 
 object DenseNodesIterator {
 
@@ -52,16 +52,34 @@ class DenseNodesIterator(osmosisStringTable: StringTable,
                          granularity: Int = 100)
     extends Iterator[NodeEntity] {
 
-  if (osmosisDenseNode.denseinfo.isDefined && osmosisDenseNode.denseinfo.get.visible.nonEmpty) {
-    throw new Exception("Only visible nodes are implemented.")
-  }
+//  if (osmosisDenseNode.denseinfo.isDefined && osmosisDenseNode.denseinfo.get.visible.nonEmpty) {
+//    throw new Exception("Only visible nodes are implemented.")
+//  }
 
-  private val idIterator = osmosisDenseNode.id.toIterator
-  private val lonIterator = osmosisDenseNode.lon.toIterator
-  private val latIterator = osmosisDenseNode.lat.toIterator
-  private val tagsIterator = osmosisDenseNode.keysVals.toIterator
+  private val idIterator: Iterator[Long] = osmosisDenseNode.id.toIterator
+  private val lonIterator: Iterator[Long]  = osmosisDenseNode.lon.toIterator
+  private val latIterator: Iterator[Long]  = osmosisDenseNode.lat.toIterator
+  private val tagsIterator: Iterator[Int] = osmosisDenseNode.keysVals.toIterator
+  private val optionDenseInfo: Option[DenseInfo] = osmosisDenseNode.denseinfo
+  private val versionIterator: Iterator[Int] = if(optionDenseInfo.isDefined) optionDenseInfo.get.version.toIterator else Iterator.empty
+  private val timestampIterator: Iterator[Long] = if(optionDenseInfo.isDefined) optionDenseInfo.get.timestamp.toIterator else Iterator.empty
+  private val changesetIterator: Iterator[Long]  = if(optionDenseInfo.isDefined) optionDenseInfo.get.changeset.toIterator else Iterator.empty
+  private val uidIterator: Iterator[Int]  = if(optionDenseInfo.isDefined) optionDenseInfo.get.uid.toIterator else Iterator.empty
+  private val userSidIterator: Iterator[Int]  = if(optionDenseInfo.isDefined) optionDenseInfo.get.userSid.toIterator else Iterator.empty
+  private val visibleIterator: Iterator[Boolean]  = if(optionDenseInfo.isDefined) optionDenseInfo.get.visible.toIterator else Iterator.empty
 
-  private var lastNode: NodeEntity = NodeEntity(0, 0, 0, Map())
+  private var lastNode: NodeEntity = NodeEntity(
+    id = 0,
+    latitude = 0,
+    longitude = 0,
+    tags = Map(),
+    version = None,
+    timestamp = None,
+    changeset = None,
+    uid = None,
+    user_sid = None,
+    visible = None
+  )
 
   override def hasNext: Boolean = idIterator.hasNext
 
@@ -83,7 +101,18 @@ class DenseNodesIterator(osmosisStringTable: StringTable,
       .toMap
 
     // Create node
-    lastNode = NodeEntity(id, latitude, longitude, tags)
+    lastNode = NodeEntity(
+      id = id,
+      latitude = latitude,
+      longitude = longitude,
+      tags = tags,
+      version = iteratorCheck[Int](versionIterator),
+      timestamp = timestampInMillisec(iteratorCheck[Long](timestampIterator)),
+      changeset = iteratorCheck[Long](changesetIterator),
+      uid = iteratorCheck[Int](uidIterator),
+      user_sid = iteratorCheck[Int](userSidIterator),
+      visible = iteratorCheck[Boolean](visibleIterator)
+    )
 
     lastNode
   }
@@ -100,4 +129,11 @@ class DenseNodesIterator(osmosisStringTable: StringTable,
     (.000000001 * (offSet + (granularity * delta))) + currentValue
   }
 
+  def iteratorCheck[A](iterator: Iterator[A]): Option[A] = {
+    if(iterator.isEmpty || !iterator.hasNext) None else Option[A](iterator.next())
+  }
+
+  def timestampInMillisec(timeStampOption: Option[Long]): Option[Long] = {
+    if(timeStampOption.isDefined) Option[Long](timeStampOption.get*granularity) else None
+  }
 }
