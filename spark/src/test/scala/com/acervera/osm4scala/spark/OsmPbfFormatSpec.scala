@@ -25,6 +25,8 @@
 
 package com.acervera.osm4scala.spark
 
+import java.text.SimpleDateFormat
+
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession, functions => fn}
 import org.scalatest.BeforeAndAfterAll
@@ -36,6 +38,7 @@ class OsmPbfFormatSpec extends AnyWordSpec with Matchers with BeforeAndAfterAll 
   val cores = 4
   val madridPath = "core/src/test/resources/com/acervera/osm4scala/Madrid.bbbike.osm.pbf"
   val monacoPath = "core/src/test/resources/com/acervera/osm4scala/monaco-latest.osm.pbf"
+  val delawarePath = "core/src/test/resources/com/acervera/osm4scala/delaware-latest.osm.pbf"
 
   val sparkSession = SparkSession
     .builder()
@@ -115,6 +118,32 @@ class OsmPbfFormatSpec extends AnyWordSpec with Matchers with BeforeAndAfterAll 
 
     }
 
+    "parse optional field correctly" when {
+      "parse node with optional fields" in {
+        val node75390099 = loadOsmPbf(delawarePath).filter("id == 75390099").collect()(0)
+        node75390099.getAs[Long]("id") shouldBe 75390099L
+        node75390099.getAs[Byte]("type") shouldBe 0
+        node75390099.getAs[Double]("latitude") shouldBe (39.7221284 +- 0.001)
+        node75390099.getAs[Double]("longitude") shouldBe (-75.7886029 +- 0.001)
+        node75390099.getAs[Map[String, String]]("tags") shouldBe
+          Map(
+            "ele" -> "240",
+            "ref" -> "1",
+            "name" -> "Tri-State Marker",
+            "historic" -> "boundary_stone",
+            "description" -> "Lat-Long (NAD27) \tN39°43'26.3\" W75°47'19.9\"\nUTM (NAD27) \t18S 432415 4397212\nUTM (WGS84) \t18S 432391 4397420",
+            "inscription" -> "Top: U.S. COAST & GEODETIC SURVEY REFERENCE MARK / FOR INFORMATION WRITE TO THE DIRECTOR, WASHINGTON, D.C. / $2500 FINE OR IMPRISONMENT FOR DISTURBING THIS MARK. / MD P CORNER NO 2 1935 Side 1: M Side 2: M Side 3: P 1849 Side 4: D"
+          )
+        node75390099.getAs[Seq[Any]]("nodes") shouldBe Seq.empty
+        node75390099.getAs[Seq[Any]]("relations") shouldBe Seq.empty
+        node75390099.getAs[Int]("version") shouldBe 9
+        node75390099.getAs[Int]("changeset") shouldBe 0
+        print(node75390099)
+        val format = new SimpleDateFormat("YYYY-MM-dd'T'HH:mm:ss'Z'")
+        node75390099.getAs[Long]("timestamp") shouldBe format.parse("2020-06-19T02:30:15Z").getTime
+      }
+    }
+
     "export to other formats" in {
       val threeExamples = loadOsmPbf(madridPath)
         .filter("id == 55799 || id == 3996192 || id == 171946")
@@ -132,6 +161,8 @@ class OsmPbfFormatSpec extends AnyWordSpec with Matchers with BeforeAndAfterAll 
         .collect()
 
       val readFromPbf = threeExamples.collect();
+
+      print(s"test number ${readFromOrc.length}")
 
       readFromOrc should be(readFromPbf)
 
