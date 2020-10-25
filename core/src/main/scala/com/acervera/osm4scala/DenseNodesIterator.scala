@@ -26,18 +26,11 @@
 package com.acervera.osm4scala
 
 import com.acervera.osm4scala.model.NodeEntity
+import com.acervera.osm4scala.utilities.DecompressUtils.{decompressChangeset, decompressCoord, decompressTimestamp, decompressUid, decompressUserSid, iteratorCheck}
 import org.openstreetmap.osmosis.osmbinary.osmformat.{DenseInfo, DenseNodes, StringTable}
-
-object DenseNodesIterator {
-
-  def apply(osmosisStringTable: StringTable, osmosisDenseNode: DenseNodes): DenseNodesIterator =
-    new DenseNodesIterator(osmosisStringTable, osmosisDenseNode)
-
-}
 
 /**
   * Iterator over a DenseDataNode block.
-  * By default, lanOffset, longOffset and graularity is 0, 0 and 100 because I did not found pbf files with other values.
   *
   * @param osmosisStringTable
   * @param osmosisDenseNode
@@ -45,16 +38,13 @@ object DenseNodesIterator {
   * @param lonOffset
   * @param granularity
   */
-class DenseNodesIterator(osmosisStringTable: StringTable,
+case class DenseNodesIterator(osmosisStringTable: StringTable,
                          osmosisDenseNode: DenseNodes,
-                         latOffset: Long = 0,
-                         lonOffset: Long = 0,
-                         granularity: Int = 100)
+                         latOffset: Option[Long] = None,
+                         lonOffset: Option[Long] = None,
+                         granularity: Option[Int] = None,
+                         dateGranularity: Option[Int] = None)
     extends Iterator[NodeEntity] {
-
-//  if (osmosisDenseNode.denseinfo.isDefined && osmosisDenseNode.denseinfo.get.visible.nonEmpty) {
-//    throw new Exception("Only visible nodes are implemented.")
-//  }
 
   private val idIterator: Iterator[Long] = osmosisDenseNode.id.toIterator
   private val lonIterator: Iterator[Long]  = osmosisDenseNode.lon.toIterator
@@ -67,6 +57,11 @@ class DenseNodesIterator(osmosisStringTable: StringTable,
   private val uidIterator: Iterator[Int]  = if(optionDenseInfo.isDefined) optionDenseInfo.get.uid.toIterator else Iterator.empty
   private val userSidIterator: Iterator[Int]  = if(optionDenseInfo.isDefined) optionDenseInfo.get.userSid.toIterator else Iterator.empty
   private val visibleIterator: Iterator[Boolean]  = if(optionDenseInfo.isDefined) optionDenseInfo.get.visible.toIterator else Iterator.empty
+
+  private val _latOffSet: Long = latOffset.getOrElse[Long](DenseNodesIterator.DEFAULT_LAT_OFFSET)
+  private val _lonOffSet: Long = lonOffset.getOrElse[Long](DenseNodesIterator.DEFAULT_LON_OFFSET)
+  private val _granularity: Int = granularity.getOrElse[Int](DenseNodesIterator.DEFAULT_GRANULARITY)
+  private val _dateGranularity: Int = dateGranularity.getOrElse[Int](DenseNodesIterator.DEFAULT_DATE_GRANULARITY)
 
   private var lastNode: NodeEntity = NodeEntity(
     id = 0,
@@ -87,9 +82,9 @@ class DenseNodesIterator(osmosisStringTable: StringTable,
 
     val id = idIterator.next() + lastNode.id
     val latitude =
-      decompressCoord(latOffset, latIterator.next(), lastNode.latitude)
+      decompressCoord(_latOffSet, latIterator.next(), _granularity, lastNode.latitude)
     val longitude =
-      decompressCoord(lonOffset, lonIterator.next(), lastNode.longitude)
+      decompressCoord(_lonOffSet, lonIterator.next(), _granularity, lastNode.longitude)
     val tags = tagsIterator
       .takeWhile(_ != 0L)
       .grouped(2)
@@ -107,33 +102,21 @@ class DenseNodesIterator(osmosisStringTable: StringTable,
       longitude = longitude,
       tags = tags,
       version = iteratorCheck[Int](versionIterator),
-      timestamp = timestampInMillisec(iteratorCheck[Long](timestampIterator)),
-      changeset = iteratorCheck[Long](changesetIterator),
-      uid = iteratorCheck[Int](uidIterator),
-      user_sid = iteratorCheck[Int](userSidIterator),
+      timestamp = decompressTimestamp(iteratorCheck[Long](timestampIterator), _dateGranularity, lastNode.timestamp),
+      changeset = decompressChangeset(iteratorCheck[Long](changesetIterator), lastNode.changeset),
+      uid = decompressUid(iteratorCheck[Int](uidIterator), lastNode.uid),
+      user_sid = decompressUserSid(iteratorCheck[Int](userSidIterator), lastNode.user_sid),
       visible = iteratorCheck[Boolean](visibleIterator)
     )
 
     lastNode
   }
 
-  /**
-    * Calculate coordinate applying offset, granularity and delta.
-    *
-    * @param offSet
-    * @param delta
-    * @param currentValue
-    * @return
-    */
-  def decompressCoord(offSet: Long, delta: Long, currentValue: Double): Double = {
-    (.000000001 * (offSet + (granularity * delta))) + currentValue
-  }
+}
 
-  def iteratorCheck[A](iterator: Iterator[A]): Option[A] = {
-    if(iterator.isEmpty || !iterator.hasNext) None else Option[A](iterator.next())
-  }
-
-  def timestampInMillisec(timeStampOption: Option[Long]): Option[Long] = {
-    if(timeStampOption.isDefined) Option[Long](timeStampOption.get*granularity) else None
-  }
+object DenseNodesIterator {
+  private val DEFAULT_LAT_OFFSET = 0
+  private val DEFAULT_LON_OFFSET = 0
+  private val DEFAULT_GRANULARITY = 100
+  private val DEFAULT_DATE_GRANULARITY = 1000
 }
