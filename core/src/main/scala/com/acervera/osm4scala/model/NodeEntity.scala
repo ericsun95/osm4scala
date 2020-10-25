@@ -40,6 +40,14 @@ case class NodeEntity(id: Long,
                       visible: Option[Boolean]) extends OSMEntity {
   override val osmModel: OSMTypes.Value = OSMTypes.Node
 
+  def apply(id: Long,
+            latitude: Double,
+            longitude: Double,
+            tags: Map[String, String]): NodeEntity = {
+    NodeEntity(id, latitude, longitude, tags,
+      None, None, None, None, None, None)
+  }
+
   override def toString: String = {
     s"Node id: ${id}, " +
       s"coordinate: (${latitude}, ${latitude}), " +

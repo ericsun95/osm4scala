@@ -41,6 +41,14 @@ case class WayEntity(id: Long,
                      visible: Option[Boolean]) extends OSMEntity {
 
   override val osmModel: OSMTypes.Value = OSMTypes.Way
+
+  def apply(id: Long,
+            nodes: Seq[Long],
+            tags: Map[String, String]): WayEntity = {
+    WayEntity(id, nodes, tags,
+      None, None, None, None, None, None)
+  }
+
   override def toString: String = {
     s"Way id: ${id}, " +
       s"nodes: ${nodes}, " +
@@ -61,7 +69,17 @@ case class WayEntity(id: Long,
 
 object WayEntity {
 
-  def apply(osmosisStringTable: StringTable, osmosisWay: Way): WayEntity = {
+  val DEFAULT_DATE_GRANULARITY: Int = 1000
+
+  def apply(osmosisWay: Way, osmosisStringTable: StringTable): WayEntity = {
+    apply(osmosisWay, osmosisStringTable, Option[Int](DEFAULT_DATE_GRANULARITY))
+  }
+
+  def apply(osmosisWay: Way,
+            osmosisStringTable: StringTable,
+            dateGranularity: Option[Int]): WayEntity = {
+
+    val _dateGranularity: Int = dateGranularity.getOrElse(DEFAULT_DATE_GRANULARITY)
 
     // Calculate nodes references in stored in delta compression.
     val nodes: Seq[Long] = osmosisWay.refs.scanLeft(0L) { _ + _ }.drop(1)
@@ -77,7 +95,7 @@ object WayEntity {
       nodes = nodes,
       tags = tags,
       version = if(optionalInfo.isDefined) optionalInfo.get.version else None,
-      timestamp = if(optionalInfo.isDefined) optionalInfo.get.timestamp else None,
+      timestamp = if(optionalInfo.isDefined && optionalInfo.get.timestamp.isDefined) Option[Long](optionalInfo.get.timestamp.get * _dateGranularity) else None,
       changeset = if(optionalInfo.isDefined) optionalInfo.get.changeset else None,
       uid = if(optionalInfo.isDefined) optionalInfo.get.uid else None,
       user_sid = if(optionalInfo.isDefined) optionalInfo.get.userSid else None,

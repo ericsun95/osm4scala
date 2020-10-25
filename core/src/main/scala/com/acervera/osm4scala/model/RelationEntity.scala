@@ -33,14 +33,22 @@ import org.openstreetmap.osmosis.osmbinary.osmformat.{Info, Relation, StringTabl
 case class RelationEntity(id: Long,
                           relations: Seq[RelationMemberEntity],
                           tags: Map[String, String],
-                          version: Option[Int] = None,
-                          timestamp: Option[Long] = None,
-                          changeset: Option[Long] = None,
+                          version: Option[Int],
+                          timestamp: Option[Long],
+                          changeset: Option[Long],
                           uid: Option[Int],
-                          user_sid: Option[Int] = None,
-                          visible: Option[Boolean] = None) extends OSMEntity {
+                          user_sid: Option[Int],
+                          visible: Option[Boolean]) extends OSMEntity {
 
   override val osmModel: OSMTypes.Value = OSMTypes.Relation
+
+  def apply(id: Long,
+            relations: Seq[RelationMemberEntity],
+            tags: Map[String, String]): RelationEntity = {
+    RelationEntity(id, relations, tags,
+      None, None, None, None, None, None)
+  }
+
   override def toString: String = {
     s"Relation id: ${id}, " +
       s"relations: ${relations}, " +
@@ -57,7 +65,17 @@ case class RelationEntity(id: Long,
 
 object RelationEntity {
 
-  def apply(osmosisStringTable: StringTable, osmosisRelation: Relation): RelationEntity = {
+  val DEFAULT_DATE_GRANULARITY: Int = 1000
+
+  def apply(osmosisRelation: Relation, osmosisStringTable: StringTable): RelationEntity = {
+    apply(osmosisRelation, osmosisStringTable, Option[Int](DEFAULT_DATE_GRANULARITY))
+  }
+
+  def apply(osmosisRelation: Relation,
+            osmosisStringTable: StringTable,
+            dateGranularity: Option[Int]): RelationEntity = {
+
+    val _dateGranularity: Int = dateGranularity.getOrElse(DEFAULT_DATE_GRANULARITY)
 
     // Calculate tags using the StringTable.
     val tags: Map[String, String] = (osmosisRelation.keys, osmosisRelation.vals).zipped.map { (k, v) =>
@@ -79,7 +97,7 @@ object RelationEntity {
       relations = relations,
       tags = tags,
       version = if(optionalInfo.isDefined) optionalInfo.get.version else None,
-      timestamp = if(optionalInfo.isDefined) optionalInfo.get.timestamp else None,
+      timestamp = if(optionalInfo.isDefined && optionalInfo.get.timestamp.isDefined) Option[Long](optionalInfo.get.timestamp.get * _dateGranularity) else None,
       changeset = if(optionalInfo.isDefined) optionalInfo.get.changeset else None,
       uid = if(optionalInfo.isDefined) optionalInfo.get.uid else None,
       user_sid = if(optionalInfo.isDefined) optionalInfo.get.userSid else None,
