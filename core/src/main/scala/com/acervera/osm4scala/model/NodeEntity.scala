@@ -57,6 +57,6 @@ case class NodeEntity(id: Long,
       s"changeset: ${changeset.getOrElse("None")}, " +
       s"uid: ${uid.getOrElse("None")}, " +
       s"user_sid: ${user_sid.getOrElse("None")}, " +
-      s"visible: ${visible.getOrElse("True")}"
+      s"visible: ${visible.getOrElse("True")}\n"
   }
 }

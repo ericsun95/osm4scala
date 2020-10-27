@@ -58,7 +58,7 @@ case class WayEntity(id: Long,
       s"changeset: ${changeset.getOrElse("None")}, " +
       s"uid: ${uid.getOrElse("None")}, " +
       s"user_sid: ${user_sid.getOrElse("None")}, " +
-      s"visible: ${visible.getOrElse("True")}"
+      s"visible: ${visible.getOrElse("True")}\n"
   }
 
   object WayEntityTypes extends Enumeration { // TODO: How to know the type ?????
@@ -82,6 +82,7 @@ object WayEntity {
     val _dateGranularity: Int = dateGranularity.getOrElse(DEFAULT_DATE_GRANULARITY)
 
     // Calculate nodes references in stored in delta compression.
+    // Similar to calculate cumulative sum here, drop the first 0L
     val nodes: Seq[Long] = osmosisWay.refs.scanLeft(0L) { _ + _ }.drop(1)
     val optionalInfo: Option[Info] = osmosisWay.info
 
@@ -90,16 +91,23 @@ object WayEntity {
       osmosisStringTable.s(k).toString("UTF-8") -> osmosisStringTable.s(v).toString("UTF-8")
     }.toMap
 
+    val version: Option[Int] = optionalInfo.filter(_.version.isDefined).map(_.version.get)
+    val timestamp: Option[Long] = optionalInfo.filter(_.timestamp.isDefined).map(_.version.get * _dateGranularity)
+    val changeset: Option[Long] = optionalInfo.filter(_.changeset.isDefined).map(_.changeset.get)
+    val uid: Option[Int] = optionalInfo.filter(_.uid.isDefined).map(_.uid.get)
+    val user_sid: Option[Int] = optionalInfo.filter(_.userSid.isDefined).map(_.userSid.get)
+    val visible: Option[Boolean] = optionalInfo.filter(_.visible.isDefined).map(_.visible.get)
+
     WayEntity(
       id = osmosisWay.id,
       nodes = nodes,
       tags = tags,
-      version = if(optionalInfo.isDefined) optionalInfo.get.version else None,
-      timestamp = if(optionalInfo.isDefined && optionalInfo.get.timestamp.isDefined) Option[Long](optionalInfo.get.timestamp.get * _dateGranularity) else None,
-      changeset = if(optionalInfo.isDefined) optionalInfo.get.changeset else None,
-      uid = if(optionalInfo.isDefined) optionalInfo.get.uid else None,
-      user_sid = if(optionalInfo.isDefined) optionalInfo.get.userSid else None,
-      visible = if(optionalInfo.isDefined) optionalInfo.get.visible else None
+      version = version,
+      timestamp = timestamp,
+      changeset = changeset,
+      uid = uid,
+      user_sid = user_sid,
+      visible = visible
     )
   }
 

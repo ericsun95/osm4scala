@@ -28,7 +28,7 @@ package com.acervera.osm4scala.utilities
 /**
   * This Util object store the way to decompress osm entity fields. Based on wiki
   * here: https://wiki.openstreetmap.org/wiki/PBF_Format#File_format
-  * We need to decompress coordinates, timestamp, changeset, uid and user_uid when
+  * We need to decompress coordinates, timestamp, changeset, uid and user_sid when
   * processing DenseNode and Dense Info
   */
 object DecompressUtils {
@@ -54,21 +54,23 @@ object DecompressUtils {
   def decompressTimestamp(currentTimeStampOffSet: Option[Long],
                           dateGranularity: Int,
                           lastTimestamp: Option[Long]): Option[Long] = {
-    if(currentTimeStampOffSet.isDefined) Option[Long](currentTimeStampOffSet.get*dateGranularity + lastTimestamp.getOrElse[Long](0)) else None
+    currentTimeStampOffSet.map(
+      offSet => offSet*dateGranularity + lastTimestamp.getOrElse(0L)
+    )
   }
 
   def decompressChangeset(currentChangsetOffSet: Option[Long],
                           lastChangset: Option[Long]): Option[Long] = {
-    if(currentChangsetOffSet.isDefined) Option[Long](currentChangsetOffSet.get + lastChangset.getOrElse[Long](0)) else None
+    currentChangsetOffSet.map(offSet => offSet + lastChangset.getOrElse(0L))
   }
 
   def decompressUid(currentUidOffSet: Option[Int],
                     lastUid: Option[Int]): Option[Int] = {
-    if(currentUidOffSet.isDefined) Option[Int](currentUidOffSet.get + lastUid.getOrElse[Int](0)) else None
+    currentUidOffSet.map(offSet => offSet + lastUid.getOrElse(0))
   }
 
-  def decompressUserSid(userIdOption: Option[Int],
+  def decompressUserSid(currentUserUidOffSet: Option[Int],
                        lastUserSid: Option[Int]): Option[Int] = {
-    if(userIdOption.isDefined) Option[Int](userIdOption.get + lastUserSid.getOrElse[Int](0)) else None
+    currentUserUidOffSet.map(offSet => offSet + lastUserSid.getOrElse(0))
   }
 }

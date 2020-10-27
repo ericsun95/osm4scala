@@ -58,7 +58,7 @@ case class RelationEntity(id: Long,
       s"changeset: ${changeset.getOrElse("None")}, " +
       s"uid: ${uid.getOrElse("None")}, " +
       s"user_sid: ${user_sid.getOrElse("None")}, " +
-      s"visible: ${visible.getOrElse("True")}"
+      s"visible: ${visible.getOrElse("True")}\n"
   }
 
 }
@@ -92,16 +92,23 @@ object RelationEntity {
       RelationMemberEntity(m, RelationMemberEntityTypes(t.value), osmosisStringTable.s(r).toString("UTF-8"))
     }
 
+    val version: Option[Int] = optionalInfo.filter(_.version.isDefined).map(_.version.get)
+    val timestamp: Option[Long] = optionalInfo.filter(_.timestamp.isDefined).map(_.version.get * _dateGranularity)
+    val changeset: Option[Long] = optionalInfo.filter(_.changeset.isDefined).map(_.changeset.get)
+    val uid: Option[Int] = optionalInfo.filter(_.uid.isDefined).map(_.uid.get)
+    val user_sid: Option[Int] = optionalInfo.filter(_.userSid.isDefined).map(_.userSid.get)
+    val visible: Option[Boolean] = optionalInfo.filter(_.visible.isDefined).map(_.visible.get)
+
     RelationEntity(
       id = osmosisRelation.id,
       relations = relations,
       tags = tags,
-      version = if(optionalInfo.isDefined) optionalInfo.get.version else None,
-      timestamp = if(optionalInfo.isDefined && optionalInfo.get.timestamp.isDefined) Option[Long](optionalInfo.get.timestamp.get * _dateGranularity) else None,
-      changeset = if(optionalInfo.isDefined) optionalInfo.get.changeset else None,
-      uid = if(optionalInfo.isDefined) optionalInfo.get.uid else None,
-      user_sid = if(optionalInfo.isDefined) optionalInfo.get.userSid else None,
-      visible = if(optionalInfo.isDefined) optionalInfo.get.visible else None
+      version = version,
+      timestamp = timestamp,
+      changeset = changeset,
+      uid = uid,
+      user_sid = user_sid,
+      visible = visible
     )
   }
 
